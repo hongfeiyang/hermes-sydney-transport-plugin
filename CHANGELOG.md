@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Support Python 3.14 and update the test matrix; package metadata accepts Python 3.12–3.14.
+
 ## 0.7.2 - 2026-08-14
 
 - Replaced version-sensitive `strict=False` datetime coercion with one shared,

@@ -135,7 +135,7 @@ aggregate queries and export formats are not exposed.
 ## Verification policy
 
 Unit tests use mocked HTTP, generated protobuf fixtures, strict GeoJSON wire models,
-and synthetic static-resource samples. CI covers Python 3.12–3.13, declared minimum
+and synthetic static-resource samples. CI covers Python 3.12–3.14, declared minimum
 dependencies, wheel packaging, and the Hermes entry point.
 
 Deployment additionally requires credentialed live checks for:

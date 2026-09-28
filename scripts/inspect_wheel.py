@@ -42,7 +42,7 @@ def main() -> int:
     requires_python = Parser().parsestr(metadata).get("Requires-Python", "")
     if {part.strip() for part in requires_python.split(",")} != {
         ">=3.12",
-        "<3.14",
+        "<3.15",
     }:
         raise SystemExit("wheel has unexpected Python compatibility metadata")
     print(f"Wheel contract: OK ({wheel.name})")

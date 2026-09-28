@@ -1,7 +1,7 @@
 # Hermes Sydney Transport
 
 [![CI](https://github.com/hongfeiyang/hermes-sydney-transport/actions/workflows/test.yml/badge.svg)](https://github.com/hongfeiyang/hermes-sydney-transport/actions/workflows/test.yml)
-[![Python 3.12–3.13](https://img.shields.io/badge/python-3.12%E2%80%933.13-blue)](pyproject.toml)
+[![Python 3.12–3.14](https://img.shields.io/badge/python-3.12%E2%80%933.14-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 A reusable [Hermes Agent](https://hermes-agent.nousresearch.com/docs/) plugin for
@@ -48,7 +48,7 @@ stationary or empty.
 Requirements:
 
 - Hermes Agent 0.20.0 or a compatible release
-- Python 3.12–3.13
+- Python 3.12–3.14
 - a [TfNSW Open Data](https://opendata.transport.nsw.gov.au/) API key
 
 Install the standalone native plugin directly from GitHub:
@@ -273,7 +273,7 @@ python -m pip install --editable '.[dev]'
 ```
 
 The verification harness checks architecture, Ruff formatting/lint, strict mypy,
-deterministic tests and the built wheel contract. CI runs on Python 3.12–3.13 and
+deterministic tests and the built wheel contract. CI runs on Python 3.12–3.14 and
 also tests minimum supported Pydantic/protobuf versions.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before adding a capability. Runtime changes

@@ -3,7 +3,7 @@
 > Open-source Hermes Agent plugin for Sydney public transport, GTFS-Realtime route
 > disruptions and vehicle tracking, stop accessibility, Complete GTFS timetables,
 > live NSW road hazards, and historical NSW Roads Traffic Volume Counts. Python
-> 3.12-3.13; MIT licensed; requires TFNSW_API_KEY.
+> 3.12-3.14; MIT licensed; requires TFNSW_API_KEY.
 
 Canonical repository: https://github.com/hongfeiyang/hermes-sydney-transport
 Plugin name: sydney-transport
