@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-- Support Python 3.14 and update the test matrix; package metadata accepts Python 3.12–3.14.
+## 0.7.3 - 2026-10-10
+
+- Retry transient invalid Trip Planner response payloads and mark exhausted schema failures retryable.
+- Support Python 3.14 in package metadata and CI.
 
 ## 0.7.2 - 2026-08-14
 

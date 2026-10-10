@@ -137,7 +137,11 @@ class TfnswTripPlannerRepository:
 
     def journey_candidates(self, request: TripPlanInput) -> JourneyBoard:
         payload = normalise_journeys(
-            self._decode("journey", journey_params(request), self._journeys)
+            self._transport.fetch_decoded(
+                TRIP_PLANNER_ENDPOINTS["journey"],
+                params=journey_params(request),
+                decoder=self._journeys,
+            )
         )
         candidates = tuple(
             mapped

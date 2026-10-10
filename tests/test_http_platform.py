@@ -119,6 +119,57 @@ class TfnswHttpClientContractTests(unittest.TestCase):
         self.assertEqual(calls, 2)
         self.assertEqual(delays, [0.5])
 
+    def test_fetch_decoded_retries_invalid_payload_then_returns_decoded_value(self):
+        calls = 0
+        delays: list[float] = []
+
+        def handler(_: httpx.Request) -> httpx.Response:
+            nonlocal calls
+            calls += 1
+            body = b'{"state":"invalid"}' if calls == 1 else b'{"state":"ok"}'
+            return httpx.Response(
+                200,
+                headers={"Content-Type": "application/json"},
+                content=body,
+            )
+
+        def decode(body: bytes) -> str:
+            if b'"invalid"' in body:
+                raise DomainError("invalid_upstream_response", "invalid fixture")
+            return "ok"
+
+        result = self._client(
+            httpx.MockTransport(handler), attempts=3, sleeper=delays.append
+        ).fetch_decoded(_endpoint(), decoder=decode)
+
+        self.assertEqual(result, "ok")
+        self.assertEqual(calls, 2)
+        self.assertEqual(delays, [0.0])
+
+    def test_fetch_decoded_marks_exhausted_invalid_payload_retryable(self):
+        calls = 0
+
+        def handler(_: httpx.Request) -> httpx.Response:
+            nonlocal calls
+            calls += 1
+            return httpx.Response(
+                200,
+                headers={"Content-Type": "application/json"},
+                content=b'{"state":"invalid"}',
+            )
+
+        def decode(_: bytes) -> str:
+            raise DomainError("invalid_upstream_response", "invalid fixture")
+
+        with self.assertRaises(DomainError) as caught:
+            self._client(
+                httpx.MockTransport(handler), attempts=2, sleeper=lambda _: None
+            ).fetch_decoded(_endpoint(), decoder=decode)
+
+        self.assertEqual(calls, 2)
+        self.assertEqual(caught.exception.code, "invalid_upstream_response")
+        self.assertTrue(caught.exception.retryable)
+
     def test_maps_timeout_after_bounded_retries(self) -> None:
         calls = 0
 

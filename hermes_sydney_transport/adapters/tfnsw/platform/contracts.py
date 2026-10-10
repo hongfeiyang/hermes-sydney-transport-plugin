@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -99,6 +99,14 @@ class HttpTransport(Protocol):
         params: QueryParams | None = None,
         if_modified_since: str | None = None,
     ) -> HttpPayload: ...
+
+    def fetch_decoded[ResultT](
+        self,
+        endpoint: EndpointSpec,
+        *,
+        params: QueryParams | None = None,
+        decoder: Callable[[bytes], ResultT],
+    ) -> ResultT: ...
 
     def download(
         self,

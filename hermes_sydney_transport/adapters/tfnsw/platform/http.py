@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 
 import httpx
-from tenacity import Retrying, retry_if_exception_type, stop_after_attempt
+from tenacity import (
+    Retrying,
+    retry_if_exception,
+    retry_if_exception_type,
+    stop_after_attempt,
+)
 
 from ....models.errors import DomainError
 from ....models.metadata import USER_AGENT
@@ -19,15 +24,7 @@ from .contracts import (
     QueryParams,
     RetryPolicy,
 )
-
-_AUTH_FAILURES = frozenset({401, 403})
-_RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
-
-
-@dataclass(slots=True)
-class _RetryableStatus(Exception):
-    status: int
-    retry_after: str | None
+from .retry import RetryableStatus, retry_delay, validate_status
 
 
 class TfnswHttpClient(HttpTransport):
@@ -63,6 +60,26 @@ class TfnswHttpClient(HttpTransport):
     ) -> HttpPayload:
         return self._run(lambda: self._fetch_once(endpoint, params, if_modified_since))
 
+    def fetch_decoded[ResultT](
+        self,
+        endpoint: EndpointSpec,
+        *,
+        params: QueryParams | None = None,
+        decoder: Callable[[bytes], ResultT],
+    ) -> ResultT:
+        """Retry transient invalid payloads while keeping decoding in its codec."""
+
+        def operation() -> ResultT:
+            payload = self._fetch_once(endpoint, params, None)
+            if payload.body is None:
+                raise DomainError(
+                    "invalid_upstream_response",
+                    "TfNSW response did not contain a body.",
+                )
+            return decoder(payload.body)
+
+        return self._run(operation, retry_invalid_response=True)
+
     def download(
         self,
         endpoint: EndpointSpec,
@@ -79,19 +96,38 @@ class TfnswHttpClient(HttpTransport):
             destination.unlink(missing_ok=True)
             raise
 
-    def _run[ResultT](self, operation: Callable[[], ResultT]) -> ResultT:
+    def _run[ResultT](
+        self,
+        operation: Callable[[], ResultT],
+        *,
+        retry_invalid_response: bool = False,
+    ) -> ResultT:
+        retryable_errors = (
+            RetryableStatus,
+            httpx.TimeoutException,
+            httpx.TransportError,
+        )
+        retry_policy = (
+            retry_if_exception_type(retryable_errors)
+            | retry_if_exception(
+                lambda exc: (
+                    isinstance(exc, DomainError)
+                    and exc.code == "invalid_upstream_response"
+                )
+            )
+            if retry_invalid_response
+            else retry_if_exception_type(retryable_errors)
+        )
         retryer = Retrying(
             stop=stop_after_attempt(self._retry_policy.max_attempts),
-            retry=retry_if_exception_type(
-                (_RetryableStatus, httpx.TimeoutException, httpx.TransportError)
-            ),
-            wait=self._retry_delay,
+            retry=retry_policy,
+            wait=partial(retry_delay, policy=self._retry_policy),
             sleep=self._sleeper,
             reraise=True,
         )
         try:
             return retryer(operation)
-        except _RetryableStatus as exc:
+        except RetryableStatus as exc:
             raise DomainError(
                 "upstream_http_error",
                 f"TfNSW request failed with HTTP {exc.status}.",
@@ -110,6 +146,10 @@ class TfnswHttpClient(HttpTransport):
                 "TfNSW could not be reached before retry attempts were exhausted.",
                 retryable=True,
             ) from exc
+        except DomainError as exc:
+            if retry_invalid_response and exc.code == "invalid_upstream_response":
+                raise DomainError(exc.code, exc.message, retryable=True) from exc
+            raise
 
     def close(self) -> None:
         if self._owns_client:
@@ -133,7 +173,7 @@ class TfnswHttpClient(HttpTransport):
         ) as response:
             if response.status_code == 304 and endpoint.allow_not_modified:
                 return self._payload(response, body=None, not_modified=True)
-            self._validate_status(response)
+            validate_status(response)
             self._validate_content_type(endpoint, response)
             self._validate_declared_size(endpoint, response)
             return self._payload(
@@ -157,7 +197,7 @@ class TfnswHttpClient(HttpTransport):
         ) as response:
             if response.status_code == 304 and endpoint.allow_not_modified:
                 return self._payload(response, body=None, not_modified=True)
-            self._validate_status(response)
+            validate_status(response)
             self._validate_content_type(endpoint, response)
             self._validate_declared_size(endpoint, response)
             self._write_bounded(endpoint, response, destination)
@@ -172,25 +212,6 @@ class TfnswHttpClient(HttpTransport):
         if if_modified_since is not None:
             headers["If-Modified-Since"] = if_modified_since
         return headers
-
-    @staticmethod
-    def _validate_status(response: httpx.Response) -> None:
-        if response.status_code in _RETRYABLE_STATUS:
-            raise _RetryableStatus(
-                response.status_code, response.headers.get("Retry-After")
-            )
-        if response.status_code in _AUTH_FAILURES:
-            raise DomainError(
-                "authentication_failed",
-                "TfNSW rejected the configured API credential.",
-                http_status=response.status_code,
-            )
-        if response.is_error or response.is_redirect:
-            raise DomainError(
-                "upstream_http_error",
-                f"TfNSW request failed with HTTP {response.status_code}.",
-                http_status=response.status_code,
-            )
 
     @staticmethod
     def _payload(
@@ -257,14 +278,3 @@ class TfnswHttpClient(HttpTransport):
                         "TfNSW returned more data than can be processed safely.",
                     )
                 output.write(chunk)
-
-    def _retry_delay(self, retry_state: object) -> float:
-        attempt = int(getattr(retry_state, "attempt_number", 1))
-        outcome = getattr(retry_state, "outcome", None)
-        exception = outcome.exception() if outcome is not None else None
-        if isinstance(exception, _RetryableStatus) and exception.retry_after:
-            retry_after = exception.retry_after
-            if retry_after.replace(".", "", 1).isdecimal():
-                return min(float(retry_after), self._retry_policy.max_delay_seconds)
-        exponential = self._retry_policy.base_delay_seconds * float(2 ** (attempt - 1))
-        return float(min(exponential, self._retry_policy.max_delay_seconds))

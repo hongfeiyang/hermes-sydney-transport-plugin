@@ -145,6 +145,14 @@ class FakeTransport:
             json.dumps(self.payloads[path]).encode(), "application/json", None
         )
 
+    def fetch_decoded(self, endpoint, *, params=None, decoder, if_modified_since=None):
+        payload = self.fetch(
+            endpoint, params=params, if_modified_since=if_modified_since
+        )
+        if payload.body is None:
+            raise AssertionError("fixture response unexpectedly had no body")
+        return decoder(payload.body)
+
 
 class TfnswClientTests(unittest.TestCase):
     def test_station_search_filters_non_train_results_and_sorts_best_match(self):
