@@ -162,7 +162,7 @@ class JourneyLegWire(WireModel):
     destination: LocationWire | None = None
     transportation: TransportationWire | None = None
     properties: ProviderPropertiesWire = Field(default_factory=ProviderPropertiesWire)
-    stop_sequence: Annotated[tuple[LocationWire, ...], Field(max_length=30)] = Field(
+    stop_sequence: Annotated[tuple[LocationWire, ...], Field(max_length=100)] = Field(
         default=(), alias="stopSequence"
     )
     infos: Annotated[tuple[InfoReferenceWire, ...], Field(max_length=30)] = ()

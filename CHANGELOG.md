@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.7.4 - 2026-10-10
+
+- Accept TfNSW stop sequences up to 100 entries; observed valid trip results contain 59.
+
 ## 0.7.3 - 2026-10-10
 
 - Retry transient invalid Trip Planner response payloads and mark exhausted schema failures retryable.
